@@ -1,0 +1,2213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendify - RS Aghisna Medika Sidareja</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font Family -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN for Analytics Graphics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- LeafletJS Interactive Maps CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar matching pastel blue theme */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f0f7ff;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #bae6fd;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7dd3fc;
+        }
+        /* Leaflet map custom radius shadow */
+        .leaflet-container {
+            border-radius: 1.5rem;
+            border: 1px solid #bae6fd;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-[#f0f7ff]/70 min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <script>
+        // Real Coordinates & Radius for RS Aghisna Medika Sidareja (Cilacap, Jawa Tengah)
+        const DEFAULT_RS_COORDS = {
+            lat: -7.485315,
+            lng: 108.799754,
+            radius: 50, // 50 meters geofence radius
+            name: "RS Aghisna Medika Sidareja"
+        };
+
+        // Default Employees Database with updated email, phone & leave counters
+        const DEFAULT_EMPLOYEES = [
+            { nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', role: 'Dokter Spesialis', department: 'Poli Dalam', password: 'user12345', phone: '081234567890', email: 'sarah.amelia@aghisnasidareja.id', leave_taken: 4 },
+            { nip: '19920412', name: 'Ners. Ahmad Hanafi', role: 'Perawat Pelaksana', department: 'Instalasi Gawat Darurat', password: 'user12345', phone: '085712345678', email: 'ahmad.hanafi@aghisnasidareja.id', leave_taken: 2 },
+            { nip: '19950820', name: 'Siti Rahma, A.Md.Keb', role: 'Bidan Senior', department: 'Poli Kandungan', password: 'user12345', phone: '089987654321', email: 'siti.rahma@aghisnasidareja.id', leave_taken: 1 },
+            { nip: '19800202', name: 'H. Budi Santoso, S.Kep', role: 'Administrator / HRD', department: 'Sekretariat', password: 'admin12345', phone: '082133445566', email: 'budi.hrd@aghisnasidareja.id', leave_taken: 0 }
+        ];
+
+        // Default Attendance Records with coordinates
+        const DEFAULT_ATTENDANCE = [
+            { id: 1, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', type: 'Masuk', shift: 'Pagi', time: '10 Jun 2026, 07:45', status: 'Tepat Waktu', distance: 6, lat: -7.485310, lng: 108.799750, photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=150' },
+            { id: 2, nip: '19920412', name: 'Ners. Ahmad Hanafi', type: 'Masuk', shift: 'Malam', time: '08 Jun 2026, 20:15', status: 'Terlambat', distance: 35, lat: -7.485330, lng: 108.799740, photo: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=150' },
+            { id: 3, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', type: 'Masuk', shift: 'Pagi', time: '05 Jun 2026, 08:05', status: 'Terlambat', distance: 12, lat: -7.485305, lng: 108.799752, photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=150' },
+            { id: 4, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', type: 'Masuk', shift: 'Pagi', time: '04 Jun 2026, 07:50', status: 'Tepat Waktu', distance: 8, lat: -7.485312, lng: 108.799755, photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=150' },
+            { id: 5, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', type: 'Masuk', shift: 'Pagi', time: '03 Jun 2026, 07:38', status: 'Tepat Waktu', distance: 14, lat: -7.485318, lng: 108.799751, photo: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=150' }
+        ];
+
+        // Default Leave Requests
+        const DEFAULT_LEAVE = [
+            { id: 1, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', type: 'Cuti', dateStart: '2026-06-11', dateEnd: '2026-06-12', description: 'Mengambil cuti tahunan keluarga.', status: 'Disetujui', attachmentName: 'dokumen_cuti.pdf' }
+        ];
+
+        // Default Help Tickets (IT Support)
+        const DEFAULT_HELP_TICKETS = [
+            { id: 1, nip: '19890101', name: 'dr. Sarah Amelia, Sp.PD', subject: 'Akurasi Koordinat GPS', message: 'Deteksi GPS saya melenceng 30m dari gerbang timur rumah sakit.', status: 'Menunggu' }
+        ];
+
+        // Default Announcements Data
+        const DEFAULT_ANNOUNCEMENTS = [
+            { id: 1, title: 'Persiapan Visitasi Akreditasi KARS', content: 'Diberitahukan kepada seluruh staf medis RS Aghisna Medika Sidareja untuk melengkapi dokumen rekam medis guna persiapan penilaian akreditasi minggu depan.', date: '10 Jun 2026' }
+        ];
+
+        const loadFromStorage = (key, defaultVal) => {
+            const data = localStorage.getItem(key);
+            if (!data) {
+                localStorage.setItem(key, JSON.stringify(defaultVal));
+                return defaultVal;
+            }
+            try {
+                const parsed = JSON.parse(data);
+                if (key === 'rs_settings' && (parsed.lat !== -7.485315 || parsed.radius !== 50)) {
+                    parsed.lat = -7.485315;
+                    parsed.lng = 108.799754;
+                    parsed.radius = 50;
+                    parsed.name = "RS Aghisna Medika Sidareja";
+                    localStorage.setItem(key, JSON.stringify(parsed));
+                }
+                return parsed;
+            } catch(e) {
+                return defaultVal;
+            }
+        };
+
+        const saveToStorage = (key, val) => {
+            localStorage.setItem(key, JSON.stringify(val));
+        };
+
+        // Load reactive app states
+        let rsSettings = loadFromStorage('rs_settings', DEFAULT_RS_COORDS);
+        let employees = loadFromStorage('rs_employees', DEFAULT_EMPLOYEES);
+        let attendanceHistory = loadFromStorage('rs_attendance', DEFAULT_ATTENDANCE);
+        let leaveRequests = loadFromStorage('rs_leaves', DEFAULT_LEAVE);
+        let announcements = loadFromStorage('rs_announcements', DEFAULT_ANNOUNCEMENTS);
+        let helpTickets = loadFromStorage('rs_help_tickets', DEFAULT_HELP_TICKETS);
+
+        let currentUser = null; 
+        let personalLineChartInstance = null; 
+        let personalChartInstance = null; 
+        let adminChartInstance = null; 
+    </script>
+
+    <!-- Custom Alert Modal Dialog Box -->
+    <div id="custom-alert" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2rem] max-w-sm w-full p-6 shadow-2xl border border-sky-100 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-sky-50 text-sky-600 mb-4">
+                <i class="fa-solid fa-circle-info text-2xl text-sky-500"></i>
+            </div>
+            <h3 id="alert-title" class="font-bold text-xl text-slate-800 mb-2">Informasi</h3>
+            <p id="alert-message" class="text-sm text-slate-500 mb-6 leading-relaxed"></p>
+            <button onclick="closeAlert()" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 rounded-2xl shadow-md transition duration-200">
+                Selesai
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN HEADER -->
+    <header class="bg-gradient-to-r from-sky-400 to-sky-500 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/20 p-2.5 rounded-2xl backdrop-blur-md shadow-inner flex items-center justify-center">
+                    <svg class="w-7 h-7 text-white fill-current animate-pulse" viewBox="0 0 24 24">
+                        <path d="M19 10.5h-5.5V5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v5.5H5c-.83 0-1.5.67-1.5 1.5s.67 1.5 1.5 1.5h5.5V19c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-5.5H19c.83 0 1.5-.67 1.5-1.5s-.67-1.5-1.5-1.5z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-tight leading-none">Attendify</h1>
+                    <p class="text-[9px] text-sky-100 font-light uppercase tracking-widest mt-1">RS Aghisna Medika Sidareja</p>
+                </div>
+            </div>
+            <div id="header-user" class="hidden flex items-center space-x-3">
+                <span id="header-user-name" class="text-xs sm:text-sm font-semibold hidden md:inline">User</span>
+                <button onclick="doLogout()" class="bg-sky-600/30 hover:bg-sky-700/40 text-sky-100 border border-sky-300/30 text-xs font-semibold px-3 sm:px-4 py-2 rounded-xl transition duration-200">
+                    Keluar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- FLOATING BOTTOM NAVIGATION BAR -->
+    <nav id="app-submenu-bar" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] bg-white/95 backdrop-blur-md border border-sky-100 shadow-[0_12px_40px_-5px_rgba(14,165,233,0.22)] rounded-[30px] p-2 flex items-center justify-center transition-all duration-300">
+        <div id="submenu-links-container" class="flex items-center justify-center space-x-2">
+            <!-- Populated via JS role definitions -->
+        </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-6xl w-full mx-auto p-4 md:p-6 mb-24">
+
+        <!-- LOGIN FORM SECTION -->
+        <section id="view-login" class="max-w-md mx-auto mt-8 bg-white/90 backdrop-blur-md rounded-[2.5rem] shadow-2xl p-6 sm:p-8 border border-sky-100/80 animate-in fade-in slide-in-from-bottom-5 duration-300">
+            <div class="text-center mb-8">
+                <div class="inline-flex p-4 bg-sky-50 rounded-[2rem] text-sky-500 mb-4 shadow-inner">
+                    <svg class="w-12 h-12 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h2 class="text-3xl font-black text-slate-800 tracking-tight">Portal Masuk</h2>
+                <p class="text-xs text-slate-400 mt-2">Selamat datang di Sistem Presensi Digital</p>
+                <p class="text-xs text-sky-600 font-extrabold mt-1 tracking-wider uppercase">RS Aghisna Medika Sidareja</p>
+            </div>
+
+            <form onsubmit="doLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Nomor Induk Pegawai (NIP)</label>
+                    <input id="login-nip" type="text" required placeholder="NIP" class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 focus:bg-white transition text-sm text-slate-800 font-medium">
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Kata Sandi (Password)</label>
+                    <input id="login-password" type="password" required placeholder="••••••••" class="w-full px-4 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 focus:bg-white transition text-sm text-slate-800 font-medium">
+                </div>
+
+                <div id="login-error" class="hidden text-rose-600 text-xs bg-rose-50 p-3 rounded-xl border border-rose-100">
+                    NIP atau Password salah. Silakan coba kembali.
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white font-bold py-3.5 rounded-2xl transition duration-300 shadow-lg shadow-sky-100">
+                    Masuk Sekarang
+                </button>
+            </form>
+
+            <div class="mt-8 pt-6 border-t border-sky-50">
+                <p class="text-xs font-bold text-sky-900 mb-2.5 flex items-center">
+                    <span class="mr-1.5">💡</span> Akun Akses Demo:
+                </p>
+                <div class="bg-sky-50/40 rounded-2xl p-4 text-[11px] text-sky-900/90 space-y-3 border border-sky-100/50">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5">
+                        <span class="font-bold text-slate-700">👩‍⚕️ Staf Medis (Sarah):</span>
+                        <div class="flex items-center space-x-1">
+                            <span class="bg-white px-2 py-0.5 rounded border border-sky-100 font-mono font-bold text-slate-800">19890101</span>
+                            <span class="text-slate-400">/</span>
+                            <span class="bg-white px-2 py-0.5 rounded border border-sky-100 font-mono font-semibold text-sky-700">user12345</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5 pt-2.5 border-t border-sky-100/30">
+                        <span class="font-bold text-slate-700">👨‍💼 HRD Admin (Budi):</span>
+                        <div class="flex items-center space-x-1">
+                            <span class="bg-white px-2 py-0.5 rounded border border-sky-100 font-mono font-bold text-slate-800">19800202</span>
+                            <span class="text-slate-400">/</span>
+                            <span class="bg-white px-2 py-0.5 rounded border border-sky-100 font-mono font-semibold text-sky-700">admin12345</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KARYAWAN VIEW SECTION -->
+        <section id="view-karyawan" class="hidden space-y-6 max-w-4xl mx-auto">
+            
+            <!-- SUB-VIEW KARYAWAN: BERANDA (HOME) -->
+            <div id="karyawan-panel-beranda" class="space-y-6 animate-in fade-in duration-300">
+                <div class="bg-gradient-to-r from-sky-100 to-sky-50 border border-sky-150 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-14 h-14 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-xl font-extrabold shadow-md">
+                            <span id="user-initial">S</span>
+                        </div>
+                        <div>
+                            <h3 id="user-fullname" class="font-extrabold text-lg text-sky-950">dr. Sarah Amelia, Sp.PD</h3>
+                            <p id="user-details" class="text-xs text-sky-700">Dokter Spesialis | Poli Dalam</p>
+                        </div>
+                    </div>
+                    <div class="text-center md:text-right bg-white/70 px-4 py-2.5 rounded-2xl border border-sky-100 w-full md:w-auto">
+                        <span class="text-[10px] text-sky-800 uppercase font-bold tracking-widest block">Hari Ini</span>
+                        <span id="live-time" class="text-sm font-semibold text-slate-700">10 Jun 2026, 09:24</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Analytics Chart Card -->
+                    <div class="bg-white p-5 rounded-3xl border border-sky-100/60 shadow-sm md:col-span-2 space-y-3 flex flex-col justify-between">
+                        <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                            📊 Grafik Kehadiran Bulanan Anda
+                        </h4>
+                        <div class="w-full max-h-[180px] flex justify-center">
+                            <canvas id="personal-attendance-chart" class="max-w-[280px]"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Leaves SOP & Progress Tracker Card -->
+                    <div class="bg-white p-5 rounded-3xl border border-sky-100/60 shadow-sm space-y-4">
+                        <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                            📋 SOP Cuti RS Aghisna
+                        </h4>
+                        <div class="text-[11px] text-slate-500 space-y-2 leading-relaxed">
+                            <p>🩺 <strong>Hak Cuti Tahunan:</strong> Maksimal 12 Hari / tahun kerja aktif.</p>
+                            <p>📑 <strong>Ketentuan Sakit:</strong> Diatas 2 hari berturut-turut wajib menyertakan surat keterangan dokter resmi.</p>
+                        </div>
+                        
+                        <!-- Leave Progress bar -->
+                        <div class="pt-2 border-t border-sky-50">
+                            <div class="flex justify-between text-[10px] font-bold text-slate-600 mb-1">
+                                <span>Cuti Terpakai</span>
+                                <span id="leave-taken-label">0 / 12 Hari</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div id="leave-taken-progress" class="bg-sky-400 h-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Announcements Container (User View) -->
+                <div class="bg-white border border-sky-100 rounded-3xl p-5 shadow-sm space-y-4">
+                    <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                        📢 Pengumuman Internal Rumah Sakit
+                    </h4>
+                    <div id="user-announcements-list" class="space-y-3">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <!-- Calendar Recap Monthly -->
+                <div class="bg-white border border-sky-100 rounded-3xl p-5 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-50 pb-3">
+                        <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                            🗓️ Kalender Rekap Presensi Juni 2026
+                        </h4>
+                        <div class="flex flex-wrap gap-2 text-[9px] font-bold">
+                            <span class="flex items-center space-x-1.5 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg">
+                                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                <span>Tepat Waktu</span>
+                            </span>
+                            <span class="flex items-center space-x-1.5 bg-amber-50 text-amber-800 px-2.5 py-1 rounded-lg">
+                                <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                                <span>Terlambat</span>
+                            </span>
+                            <span class="flex items-center space-x-1.5 bg-rose-50 text-rose-800 px-2.5 py-1 rounded-lg">
+                                <span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                                <span>Izin / Cuti / Sakit</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 bg-sky-50/50 rounded-2xl border border-sky-100/50 max-w-md mx-auto">
+                        <div class="grid grid-cols-7 gap-2 text-center text-[10px] font-extrabold text-sky-800 mb-2">
+                            <div>SEN</div><div>SEL</div><div>RAB</div><div>KAM</div><div>JUM</div><div>SAB</div><div>MIN</div>
+                        </div>
+                        <div class="grid grid-cols-7 gap-2 text-center" id="calendar-grid">
+                            <!-- Populated dynamically via JS calendar logic -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-VIEW KARYAWAN: MENU HUB PRESENSI -->
+            <div id="karyawan-panel-presensi" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-gradient-to-r from-sky-400 to-sky-500 p-5 rounded-3xl text-white shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h3 class="font-extrabold text-base">Pusat Presensi Real-Time</h3>
+                        <p class="text-[11px] text-sky-100 mt-1 leading-relaxed">Silakan ikuti instruksi di bawah untuk melakukan validasi lokasi geofence dan swafoto wajah.</p>
+                    </div>
+                </div>
+
+                <!-- Integrated Map, Validation and Camera View -->
+                <div class="bg-white p-5 sm:p-6 rounded-3xl border border-sky-100 shadow-sm space-y-6">
+                    <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                        📍 Langkah 1: Peta & Jarak Geofence RS Aghisna Medika Sidareja
+                    </h4>
+
+                    <!-- Leaflet Inline Map -->
+                    <div id="leaflet-inline-map" style="height: 260px;" class="w-full rounded-2xl border border-sky-100 shadow-inner"></div>
+
+                    <!-- Geolocation & Simulation Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <button onclick="getRealGPSLocation()" class="py-2.5 px-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-[10px] font-bold shadow-md transition flex items-center justify-center space-x-1.5">
+                            <i class="fa-solid fa-location-crosshairs animate-spin-slow"></i> <span>Minta GPS Asli</span>
+                        </button>
+                        <button onclick="setSimulatedLocation('inside')" id="btn-gps-inside-inline" class="py-2.5 px-3 bg-sky-500 text-white rounded-xl text-[10px] font-bold shadow-sm transition">
+                            🏢 Simulasi: Kawasan RS (~6m)
+                        </button>
+                        <button onclick="setSimulatedLocation('outside')" id="btn-gps-outside-inline" class="py-2.5 px-3 bg-white hover:bg-slate-50 border border-sky-100 text-slate-700 rounded-xl text-[10px] font-semibold transition">
+                            🚗 Simulasi: Luar Kawasan (1.5km)
+                        </button>
+                    </div>
+
+                    <!-- Live Distance Verification Banner -->
+                    <div id="gps-banner-inline" class="p-4 rounded-2xl flex items-start space-x-3 border transition duration-300">
+                        <div id="gps-banner-icon-inline" class="pt-0.5"></div>
+                        <div class="flex-1">
+                            <h4 id="gps-banner-title-inline" class="font-bold text-xs">Mendeteksi Posisi...</h4>
+                            <p id="gps-banner-message-inline" class="text-[10px] mt-0.5 leading-relaxed"></p>
+                        </div>
+                    </div>
+
+                    <hr class="border-sky-50" />
+
+                    <!-- Split Form & Selfie Section -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Setup Info Form -->
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                                📝 Langkah 2: Parameter Dinas
+                            </h4>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Tipe Kehadiran</label>
+                                <select id="attendance-type-select-inline" class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                                    <option value="Masuk">Masuk Kerja</option>
+                                    <option value="Pulang">Pulang Kerja</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Shift Dinas</label>
+                                <select id="attendance-shift-select-inline" class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                                    <option value="Pagi">Shift Pagi (07:00 - 14:00)</option>
+                                    <option value="Siang">Shift Siang (14:00 - 21:00)</option>
+                                    <option value="Malam">Shift Malam (21:00 - 07:00)</option>
+                                </select>
+                            </div>
+
+                            <div class="bg-sky-50/50 p-4 rounded-2xl border border-sky-100/50 text-[10px] text-sky-900 space-y-1">
+                                <p class="font-bold"><i class="fa-solid fa-circle-question mr-1"></i> Informasi Tambahan:</p>
+                                <p class="leading-relaxed">Sistem merekam swafoto wajah dan koordinat GPS secara terenkripsi untuk mencegah kecurangan dalam sistem database.</p>
+                            </div>
+                        </div>
+
+                        <!-- Webcam Swafoto Box -->
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-sky-950 tracking-wider uppercase flex items-center">
+                                📸 Langkah 3: Pengambilan Swafoto
+                            </h4>
+
+                            <div class="relative aspect-video w-full bg-slate-900 rounded-2xl overflow-hidden shadow-inner border border-sky-100 flex flex-col items-center justify-center">
+                                <div id="camera-flash-overlay-inline" class="absolute inset-0 bg-white opacity-0 transition-opacity duration-200 pointer-events-none z-10"></div>
+                                
+                                <video id="webcam-video-inline" autoplay playsinline class="w-full h-full object-cover transform scale-x-[-1] hidden"></video>
+                                
+                                <div id="webcam-fallback-inline" class="p-4 text-center text-slate-400">
+                                    <span class="text-3xl block mb-2 text-sky-400"><i class="fa-solid fa-camera animate-bounce-slow"></i></span>
+                                    <p id="camera-prompt-text-inline" class="text-[11px] font-bold text-slate-300">Kamera Non-Aktif</p>
+                                </div>
+
+                                <img id="webcam-captured-inline" alt="Captured" class="w-full h-full object-cover hidden" />
+                                <div id="webcam-guideline-inline" class="absolute inset-0 border-[3px] border-dashed border-sky-400 opacity-20 m-6 rounded-full pointer-events-none hidden"></div>
+                            </div>
+
+                            <div class="flex items-center justify-center space-x-2">
+                                <button id="btn-camera-toggle-inline" onclick="toggleWebcamStateInline()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-[10px] px-3.5 py-2.5 rounded-xl transition shadow-sm flex items-center space-x-1">
+                                    <i class="fa-solid fa-power-off"></i> <span id="camera-btn-text-inline">Nyalakan Kamera</span>
+                                </button>
+                                <button id="btn-camera-flash-inline" onclick="toggleCameraFlashInline()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 font-bold text-[10px] p-2.5 rounded-xl transition flex items-center justify-center animate-pulse" title="Toggle Flash (Fill Light)">
+                                    <i class="fa-solid fa-bolt" id="flash-icon-inline"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Final Submission Button -->
+                    <button id="btn-submit-attendance-inline" onclick="submitAttendanceProcessInline()" class="w-full mt-4 py-3.5 rounded-2xl font-bold text-xs bg-sky-500 hover:bg-sky-600 text-white shadow-md transition">
+                        Simpan & Kirim Presensi Kehadiran
+                    </button>
+
+                    <!-- Dispensasi button styled red at bottom center -->
+                    <div class="flex justify-center pt-4 border-t border-sky-50">
+                        <button onclick="openDispensasiModal()" class="w-[200px] h-[50px] bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-2xl flex items-center justify-center space-x-2 shadow-md transition shrink-0">
+                            <i class="fa-solid fa-envelope-open-text text-sm"></i>
+                            <span>Izin / Cuti / Sakit</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB-VIEW KARYAWAN: PROFIL -->
+            <div id="karyawan-panel-profil" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white rounded-3xl p-6 border border-sky-100/50 shadow-sm flex flex-col sm:flex-row sm:items-center gap-6">
+                    <div class="w-20 h-20 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center text-3xl font-black shadow-inner">
+                        <span id="profile-avatar-initial">S</span>
+                    </div>
+                    <div class="space-y-2 flex-1">
+                        <h4 id="profile-fullname" class="text-xl font-extrabold text-slate-800">dr. Sarah Amelia, Sp.PD</h4>
+                        <div class="flex flex-wrap gap-2 text-[10px]">
+                            <span class="px-2.5 py-1 bg-sky-50 text-sky-700 font-bold rounded-lg" id="profile-nip">NIP: 19890101</span>
+                            <span class="px-2.5 py-1 bg-sky-50 text-sky-700 font-bold rounded-lg" id="profile-dept">Poli Dalam</span>
+                            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-lg" id="profile-role">Dokter Spesialis</span>
+                        </div>
+                        <div class="text-xs text-slate-400 space-y-1 pt-1.5 border-t border-sky-50/50">
+                            <p id="profile-phone">📞 Telepon: 081234567890</p>
+                            <p id="profile-email">📧 Email: sarah@aghisna.id</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Menu List for Account Settings -->
+                <div class="bg-white rounded-3xl p-6 border border-sky-100/50 shadow-sm space-y-3">
+                    <h4 class="font-extrabold text-sm text-sky-950 flex items-center mb-1">
+                        <span class="mr-2">⚙️</span> Pengaturan Akun & Keamanan
+                    </h4>
+                    
+                    <div class="space-y-2">
+                        <!-- Menu Item: Ubah Kata Sandi -->
+                        <div onclick="openPasswordModal()" class="flex justify-between items-center p-4 bg-slate-50 hover:bg-sky-50/70 rounded-2xl cursor-pointer transition">
+                            <div class="flex items-center space-x-3 text-xs">
+                                <span class="text-lg">🔐</span>
+                                <span class="font-bold text-slate-700">Ubah Kata Sandi Keamanan</span>
+                            </div>
+                            <span class="text-sky-500 font-bold text-xs">&rarr;</span>
+                        </div>
+
+                        <!-- Menu Item: Lengkapi Nomor Telepon & Email -->
+                        <div onclick="openContactModal()" class="flex justify-between items-center p-4 bg-slate-50 hover:bg-sky-50/70 rounded-2xl cursor-pointer transition">
+                            <div class="flex items-center space-x-3 text-xs">
+                                <span class="text-lg">📱</span>
+                                <span class="font-bold text-slate-700">Update Nomor Telepon & Alamat Email</span>
+                            </div>
+                            <span class="text-sky-500 font-bold text-xs">&rarr;</span>
+                        </div>
+
+                        <!-- Menu Item: Pusat Bantuan & IT Support -->
+                        <div onclick="openHelpSupportModal()" class="flex justify-between items-center p-4 bg-slate-50 hover:bg-sky-50/70 rounded-2xl cursor-pointer transition">
+                            <div class="flex items-center space-x-3 text-xs">
+                                <span class="text-lg">🙋‍♂️</span>
+                                <span class="font-bold text-slate-700">Pusat Bantuan & Tiket IT Support</span>
+                            </div>
+                            <span class="text-sky-500 font-bold text-xs">&rarr;</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personal Trend Log Line Chart Box -->
+                <div class="bg-white rounded-3xl p-6 border border-sky-100/50 shadow-sm space-y-4">
+                    <h4 class="font-extrabold text-sm text-sky-950 flex items-center">
+                        <i class="fa-solid fa-chart-line mr-2 text-sky-500"></i> Analisis Jarak Absen & Kepatuhan Presensi Anda
+                    </h4>
+                    <p class="text-[11px] text-slate-400">Diagram garis di bawah ini menunjukkan dinamika radar jarak verifikasi GPS (meter) Anda dari RS Aghisna Medika Sidareja saat melakukan pencatatan absen terakhir.</p>
+                    <div class="w-full max-h-[220px] flex justify-center">
+                        <canvas id="personal-trend-line-chart" class="w-full"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ADMINISTRATOR PANEL SECTION -->
+        <section id="view-admin" class="hidden space-y-6">
+
+            <!-- SUB TAB 1: OVERVIEW DASHBOARD -->
+            <div id="adm-panel-dashboard" class="space-y-6 animate-in fade-in duration-300">
+                <!-- Stat Cards Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm text-center">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Total Staf Terdaftar</span>
+                        <span id="adm-stat-employees" class="text-3xl font-extrabold text-sky-950">4</span>
+                    </div>
+                    <div class="bg-sky-50 border border-sky-250 p-6 rounded-3xl text-center">
+                        <span class="text-[10px] text-sky-800 font-bold uppercase block mb-1">Hadir Hari Ini</span>
+                        <span id="adm-stat-attendance" class="text-3xl font-extrabold text-sky-600">2</span>
+                    </div>
+                    <div class="bg-rose-50 border border-rose-250 p-6 rounded-3xl text-center">
+                        <span class="text-[10px] text-rose-800 font-bold uppercase block mb-1">Izin / Sakit / Cuti</span>
+                        <span id="adm-stat-leaves" class="text-3xl font-extrabold text-rose-600">1</span>
+                    </div>
+                </div>
+
+                <!-- Admin Action Button Row with popups -->
+                <div class="bg-white p-5 rounded-3xl border border-sky-100 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div class="text-left">
+                        <h4 class="font-bold text-slate-800 text-sm">Pengumuman Internal Staf Medis</h4>
+                        <p class="text-slate-400 text-[11px]">Tulis, ubah, atau terbitkan pengumuman resmi ke portal depan karyawan.</p>
+                    </div>
+                    <button onclick="openAnnouncementsModal()" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-5 py-3 rounded-2xl shadow-sm transition shrink-0">
+                        📢 Kelola Pengumuman Internal
+                    </button>
+                </div>
+
+                <!-- Chart Panel in Admin View -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm md:col-span-2 space-y-3">
+                        <h4 class="font-extrabold text-sm text-sky-950">📊 Tren Kehadiran Staf Mingguan</h4>
+                        <div class="w-full max-h-[220px]">
+                            <canvas id="admin-weekly-chart" class="w-full"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm flex flex-col justify-between">
+                        <h4 class="font-extrabold text-sm text-sky-950 mb-2">📋 Ketentuan SOP Cuti</h4>
+                        <div class="text-xs text-slate-500 leading-relaxed space-y-2">
+                            <p>✔️ HRD membatasi kuota cuti tahunan maksimal <strong>12 hari kerja</strong>.</p>
+                            <p>✔️ Pengajuan dispensasi harus diinput melalui portal minimal <strong>3 hari sebelum pelaksanaan cuti</strong>.</p>
+                        </div>
+                        <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200 text-[10px] text-amber-900 mt-4 leading-relaxed">
+                            💡 Data kehadiran dan grafik disinkronisasikan otomatis dengan input presensi karyawan.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Logs Box -->
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4">
+                    <h4 class="font-extrabold text-sm text-sky-950">Aktivitas Presensi Terakhir di RS Aghisna Medika Sidareja</h4>
+                    <div id="adm-recent-logs" class="space-y-3">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB TAB 2: KELOLA KARYAWAN (CRUD) -->
+            <div id="adm-panel-karyawan" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-extrabold text-sm text-sky-950">Tambahkan / Edit Data Staf RS</h4>
+                        <button onclick="clearEmployeeForm()" class="text-[10px] text-slate-400 hover:text-slate-600 font-bold uppercase">Reset Form</button>
+                    </div>
+                    
+                    <form id="employee-crud-form" onsubmit="submitEmployeeCRUD(event)" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input id="crud-id" type="hidden" value="">
+                        <input id="crud-nip" type="text" required placeholder="Nomor Induk (NIP)" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-name" type="text" required placeholder="Nama Lengkap & Gelar" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-role" type="text" required placeholder="Jabatan (Dokter, Perawat, dll)" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-dept" type="text" required placeholder="Departemen / Poli / Ruangan" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-pass" type="password" required placeholder="Kata Sandi Login" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-phone" type="text" placeholder="No. Telepon" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-email" type="email" placeholder="Email" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        <input id="crud-leave" type="number" min="0" max="12" placeholder="Kuota Cuti Terpakai" class="p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                        
+                        <button type="submit" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs p-3 rounded-2xl shadow-sm transition col-span-1 md:col-span-3">
+                            Simpan Data Pegawai
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-3">
+                    <h4 class="font-extrabold text-sm text-sky-950">Daftar Pegawai Terdaftar</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs text-left min-w-[600px]">
+                            <thead class="bg-sky-50 text-sky-950 font-bold">
+                                <tr>
+                                    <th class="p-3 rounded-l-xl">NIP</th>
+                                    <th class="p-3">Nama Pegawai</th>
+                                    <th class="p-3">Jabatan & Poli</th>
+                                    <th class="p-3">Email & Kontak</th>
+                                    <th class="p-3 rounded-r-xl text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adm-employee-table-body">
+                                <!-- Loaded via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB TAB 3: DATA & REKAP ABSENSI -->
+            <div id="adm-panel-absensi" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <h4 class="font-extrabold text-sm text-sky-950">Logs Data Presensi & Ekspor Excel</h4>
+                        <button onclick="simulateCSVExport()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center space-x-1 shadow-sm transition">
+                            <span>📊 Ekspor CSV (Excel)</span>
+                        </button>
+                    </div>
+
+                    <!-- Filters Group -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#f0f7ff]/70 p-4 rounded-2xl border border-sky-100">
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Cari Nama / NIP</label>
+                            <input id="filter-search" oninput="applyAttendanceFilters()" type="text" placeholder="Ketik nama karyawan..." class="w-full p-2 bg-white border border-sky-100 rounded-xl text-xs focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Poli / Departemen</label>
+                            <input id="filter-dept" oninput="applyAttendanceFilters()" type="text" placeholder="Ketik departemen..." class="w-full p-2 bg-white border border-sky-100 rounded-xl text-xs focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Filter Status</label>
+                            <select id="filter-status" onchange="applyAttendanceFilters()" class="w-full p-2 bg-white border border-sky-100 rounded-xl text-xs focus:outline-none">
+                                <option value="Semua">Semua Kehadiran</option>
+                                <option value="Tepat Waktu">Tepat Waktu</option>
+                                <option value="Terlambat">Terlambat</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Filter Logs list -->
+                    <div id="adm-filtered-logs-container" class="space-y-3">
+                        <!-- Loaded via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB FOR ADMIN: TIKET BANTUAN MASUK -->
+            <div id="adm-panel-bantuan" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4">
+                    <h4 class="font-extrabold text-sm text-sky-950">🙋‍♂️ Tiket Bantuan & Pengaduan IT Staf Medis</h4>
+                    <p class="text-xs text-slate-500">Berikut adalah daftar aduan, keluhan GPS, kendala kamera, atau aduan teknis lainnya dari staf medis.</p>
+                    
+                    <div id="adm-help-tickets-container" class="space-y-3">
+                        <!-- Loaded dynamically via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUB TAB 4: SETTING LOKASI & RADIUS -->
+            <div id="adm-panel-setting" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4">
+                    <h4 class="font-extrabold text-sm text-sky-950">Konfigurasi Titik Absensi & Jarak Maksimal RS</h4>
+                    <p class="text-xs text-slate-500">Sesuaikan koordinat geografis Rumah Sakit beserta toleransi jarak maksimal dalam meter yang diizinkan.</p>
+                    
+                    <form onsubmit="saveHospitalSettings(event)" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Nama Area Presensi / Rumah Sakit</label>
+                                <input id="set-rs-name" type="text" required class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Batas Radius Maksimal (Meter)</label>
+                                <input id="set-rs-radius" type="number" required class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Garis Lintang (Latitude Target)</label>
+                                <input id="set-rs-lat" type="text" required class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-sky-800 uppercase tracking-widest mb-1.5">Garis Bujur (Longitude Target)</label>
+                                <input id="set-rs-lng" type="text" required class="w-full p-3 bg-slate-50 border border-sky-100 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs px-6 py-3 rounded-2xl shadow-sm transition">
+                            Simpan Konfigurasi Lokasi RS
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- SUB TAB 5: INTEGRASI PHP & MYSQL -->
+            <div id="adm-panel-guide" class="hidden space-y-6 animate-in fade-in duration-300">
+                <div class="bg-white p-6 rounded-3xl border border-sky-100 shadow-sm space-y-4 text-xs">
+                    <h4 class="font-extrabold text-sm text-sky-950">📚 Panduan Migrasi PHP Native & MySQL</h4>
+                    <p class="text-slate-500 leading-relaxed">Anda dapat menyalin struktur database dan cuplikan file PHP berikut untuk menghubungkan sistem frontend ini ke database server nyata Anda:</p>
+                    
+                    <div class="space-y-3">
+                        <div>
+                            <span class="font-bold text-sky-800 block mb-1">1. Struktur Skema MySQL (SQL)</span>
+                            <pre class="bg-slate-900 text-sky-300 p-4 rounded-xl overflow-x-auto font-mono text-[10px]">
+CREATE TABLE IF NOT EXISTS `karyawan` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nip` varchar(20) NOT NULL UNIQUE,
+  `nama` varchar(100) NOT NULL,
+  `jabatan` varchar(100) NOT NULL,
+  `poli` varchar(100) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `presensi` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `nip` varchar(20) NOT NULL,
+  `tipe` varchar(20) NOT NULL,
+  `shift` varchar(20) NOT NULL,
+  `waktu` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `status` varchar(30) NOT NULL,
+  `jarak` int(11) NOT NULL,
+  `lat` decimal(10,8) NOT NULL,
+  `lng` decimal(11,8) NOT NULL,
+  `foto` longtext NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- MODAL POPUP: FORM DISPENSASI (IJIN/CUTI/SAKIT) -->
+    <div id="modal-dispensasi" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-sky-100 animate-in fade-in zoom-in-95 duration-200">
+            <div class="flex justify-between items-center border-b border-sky-50 pb-3 mb-4">
+                <h3 class="font-extrabold text-sm text-sky-950 uppercase tracking-wider"><i class="fa-solid fa-envelope-open-text mr-1 text-sky-500"></i> Form Pengajuan Dispensasi</h3>
+                <button onclick="closeDispensasiModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form onsubmit="submitLeaveRequest(event)" class="space-y-3.5">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[9px] font-bold text-sky-800 uppercase tracking-widest mb-1">Jenis</label>
+                        <select id="leave-type" class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300">
+                            <option value="Sakit">Sakit</option>
+                            <option value="Izin">Izin Urgent</option>
+                            <option value="Cuti">Cuti Tahunan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-sky-800 uppercase tracking-widest mb-1">Mulai</label>
+                        <input id="leave-start" type="date" required class="w-full p-2 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[9px] font-bold text-sky-800 uppercase tracking-widest mb-1">Selesai</label>
+                        <input id="leave-end" type="date" required class="w-full p-2 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[9px] font-bold text-sky-800 uppercase tracking-widest mb-1">Keterangan / Alasan</label>
+                    <textarea id="leave-desc" rows="2" required placeholder="Tulis alasan jelas pengajuan..." class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-300"></textarea>
+                </div>
+
+                <!-- File Uploader for proof of leave docs -->
+                <div>
+                    <label class="block text-[9px] font-bold text-sky-800 uppercase tracking-widest mb-1">Upload Bukti Fisik (Dokumen/Foto/PDF)</label>
+                    <div class="relative flex items-center justify-center border-2 border-dashed border-sky-100 bg-[#f8fbff] rounded-2xl p-4 transition hover:bg-sky-50/50">
+                        <input type="file" id="leave-file-input" onchange="handleLeaveFileUpload(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        <div class="text-center space-y-1">
+                            <span class="text-xl text-sky-400 block"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                            <p id="file-upload-placeholder" class="text-[10px] text-slate-500 font-semibold">Ketuk untuk unggah berkas surat resmi</p>
+                            <p class="text-[8px] text-slate-400">PDF, DOC, PNG, JPG (Maks. 5MB)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 rounded-2xl font-bold text-xs bg-sky-500 hover:bg-sky-600 text-white shadow-md transition">
+                    Kirim Form Dispensasi
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP: UBAH PASSWORD -->
+    <div id="modal-password" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-sky-100 animate-in fade-in zoom-in-95 duration-200">
+            <h3 class="font-bold text-lg text-slate-800 mb-2">🔐 Ubah Kata Sandi</h3>
+            <p class="text-xs text-slate-400 mb-4">Pastikan Anda mengingat sandi baru Anda dengan baik.</p>
+            <form onsubmit="changeUserPassword(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Kata Sandi Lama</label>
+                    <input id="pwd-old" type="password" required class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Kata Sandi Baru</label>
+                    <input id="pwd-new" type="password" required class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Konfirmasi Sandi Baru</label>
+                    <input id="pwd-confirm" type="password" required class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div class="flex space-x-2 pt-2">
+                    <button type="button" onclick="closePasswordModal()" class="w-1/2 py-2.5 bg-slate-100 text-slate-500 font-bold rounded-xl text-xs">Kembali</button>
+                    <button type="submit" class="w-1/2 py-2.5 bg-sky-500 text-white font-bold rounded-xl text-xs">Ubah Sandi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP: UPDATE KONTAK -->
+    <div id="modal-contacts" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-sky-100 animate-in fade-in zoom-in-95 duration-200">
+            <h3 class="font-bold text-lg text-slate-800 mb-2">📱 Update Telepon & Email</h3>
+            <p class="text-xs text-slate-400 mb-4">Perbarui informasi kontak darurat dan alamat email dinas Anda.</p>
+            <form onsubmit="updateUserContacts(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nomor Telepon Aktif</label>
+                    <input id="contact-phone" type="text" required class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Alamat Email Dinas</label>
+                    <input id="contact-email" type="email" required class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div class="flex space-x-2 pt-2">
+                    <button type="button" onclick="closeContactModal()" class="w-1/2 py-2.5 bg-slate-100 text-slate-500 font-bold rounded-xl text-xs">Kembali</button>
+                    <button type="submit" class="w-1/2 py-2.5 bg-sky-500 text-white font-bold rounded-xl text-xs">Simpan Kontak</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP: TIKET BANTUAN IT SUPPORT -->
+    <div id="modal-help-support" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-sky-100 animate-in fade-in zoom-in-95 duration-200 max-h-[85vh] overflow-y-auto">
+            <h3 class="font-bold text-lg text-slate-800 mb-2">🙋‍♂️ Pusat Bantuan & IT Support</h3>
+            <p class="text-xs text-slate-400 mb-4">Kendala akurasi radar GPS, validasi selfie, atau pertanyaan teknis lain? Ajukan pengaduan langsung ke tim IT Rumah Sakit.</p>
+            
+            <form onsubmit="submitHelpRequest(event)" class="space-y-3 mb-6">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Subjek Masalah</label>
+                    <input id="help-subject" type="text" required placeholder="Contoh: Kamera Buram / GPS Melenceng" class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Detail Masalah / Laporan</label>
+                    <textarea id="help-message" rows="3" required placeholder="Jelaskan secara rinci kendala sistem yang dihadapi..." class="w-full p-2.5 bg-slate-50 border border-sky-100 rounded-xl text-xs focus:outline-none"></textarea>
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-xl text-xs transition">
+                    Kirim Pengaduan ke IT Support
+                </button>
+            </form>
+
+            <div class="pt-4 border-t border-slate-100">
+                <h4 class="font-bold text-xs text-slate-700 mb-2">❓ FAQ Singkat</h4>
+                <div class="space-y-2 text-[10px] text-slate-500">
+                    <p class="font-bold text-slate-700">Mengapa deteksi jarak GPS melenceng?</p>
+                    <p class="leading-relaxed mb-2">Pastikan browser seluler telah diberikan izin GPS presisi ("High Accuracy Mode") dan Anda sedang tidak berada di ruangan bunker beton tebal.</p>
+                </div>
+            </div>
+
+            <div class="flex space-x-2 pt-4 border-t border-slate-150 mt-4">
+                <button type="button" onclick="closeHelpSupportModal()" class="w-full py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL POPUP: KELOLA PENGUMUMAN (ADMIN) -->
+    <div id="modal-manage-announcements" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-[2.5rem] max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-sky-100 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-sky-100 pb-4 mb-5">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2.5 bg-sky-50 rounded-2xl text-sky-500">
+                        <i class="fa-solid fa-bullhorn text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-base text-sky-950 uppercase tracking-wider">Kelola Pengumuman</h3>
+                        <p class="text-[10px] text-slate-400 mt-0.5">Terbitkan berita internal rumah sakit</p>
+                    </div>
+                </div>
+                <button onclick="closeAnnouncementsModal()" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form onsubmit="submitAnnouncement(event)" class="space-y-4 mb-6 bg-sky-50/30 p-4 rounded-3xl border border-sky-100/40">
+                <span class="text-[10px] font-bold text-sky-800 uppercase tracking-widest block mb-1">Buat Pengumuman Baru</span>
+                <div>
+                    <input id="ann-title" type="text" required placeholder="Judul Pengumuman Penting..." class="p-3.5 bg-white border border-slate-250 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 rounded-2xl text-xs transition w-full font-semibold text-slate-800">
+                </div>
+                <div>
+                    <textarea id="ann-content" required placeholder="Tulis isi pengumuman/pesan penting untuk seluruh staf medis di sini..." rows="3" class="p-3.5 bg-white border border-slate-250 focus:outline-none focus:ring-4 focus:ring-sky-100 focus:border-sky-400 rounded-2xl text-xs transition w-full text-slate-700 leading-relaxed"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-sky-400 to-sky-500 hover:from-sky-500 hover:to-sky-600 text-white font-bold text-xs py-3.5 rounded-2xl shadow-md shadow-sky-100 transition duration-300">
+                    <i class="fa-solid fa-paper-plane mr-1"></i> Terbitkan Sekarang
+                </button>
+            </form>
+
+            <div class="pt-4 border-t border-sky-100">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3.5">Daftar Pengumuman Aktif</span>
+                <div id="adm-announcements-list" class="space-y-3">
+                    <!-- Loaded dynamically via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LeafletJS Interactive Mapping Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Modal Alert triggers
+        const openAlert = (title, msg) => {
+            document.getElementById('alert-title').innerText = title;
+            document.getElementById('alert-message').innerText = msg;
+            document.getElementById('custom-alert').classList.remove('hidden');
+        };
+
+        const closeAlert = () => {
+            document.getElementById('custom-alert').classList.add('hidden');
+        };
+
+        // Modal Openers & Closers
+        const openPasswordModal = () => document.getElementById('modal-password').classList.remove('hidden');
+        const closePasswordModal = () => document.getElementById('modal-password').classList.add('hidden');
+
+        const openContactModal = () => {
+            document.getElementById('contact-phone').value = currentUser.phone || '';
+            document.getElementById('contact-email').value = currentUser.email || '';
+            document.getElementById('modal-contacts').classList.remove('hidden');
+        };
+        const closeContactModal = () => document.getElementById('modal-contacts').classList.add('hidden');
+
+        const openHelpSupportModal = () => document.getElementById('modal-help-support').classList.remove('hidden');
+        const closeHelpSupportModal = () => document.getElementById('modal-help-support').classList.add('hidden');
+
+        const openAnnouncementsModal = () => document.getElementById('modal-manage-announcements').classList.remove('hidden');
+        const closeAnnouncementsModal = () => document.getElementById('modal-manage-announcements').classList.add('hidden');
+
+        const openDispensasiModal = () => {
+            document.getElementById('modal-dispensasi').classList.remove('hidden');
+            // Reset upload placeholder
+            uploadedFileBase64 = null;
+            uploadedFileName = '';
+            document.getElementById('file-upload-placeholder').innerText = "Ketuk untuk unggah berkas surat resmi";
+        };
+        const closeDispensasiModal = () => {
+            document.getElementById('modal-dispensasi').classList.add('hidden');
+        };
+
+        // Leaflet Map Inline Initialization
+        let leafletMap = null;
+        let mapUserMarker = null;
+        let mapRsCircle = null;
+        let simulatedPosition = { lat: -7.485310, lng: 108.799750 }; // Default exactly on RS Aghisna Medika Sidareja
+        let currentRealDistance = 0;
+
+        const initPresensiMap = () => {
+            const mapContainer = document.getElementById('leaflet-inline-map');
+            if (!mapContainer) return;
+
+            setTimeout(() => {
+                if (!leafletMap) {
+                    leafletMap = L.map('leaflet-inline-map').setView([rsSettings.lat, rsSettings.lng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(leafletMap);
+
+                    // Add Hospital target marker
+                    L.marker([rsSettings.lat, rsSettings.lng]).addTo(leafletMap)
+                        .bindPopup(`<b>${rsSettings.name}</b><br>Jl. Jenderal Sudirman No.1`).openPopup();
+
+                    // Add radius geofence circle
+                    mapRsCircle = L.circle([rsSettings.lat, rsSettings.lng], {
+                        color: '#0284c7',
+                        fillColor: '#bae6fd',
+                        fillOpacity: 0.35,
+                        radius: rsSettings.radius
+                    }).addTo(leafletMap);
+
+                    // Add User marker
+                    mapUserMarker = L.marker([simulatedPosition.lat, simulatedPosition.lng]).addTo(leafletMap)
+                        .bindPopup('<b>Posisi Anda</b>').openPopup();
+                } else {
+                    leafletMap.invalidateSize();
+                    mapRsCircle.setLatLng([rsSettings.lat, rsSettings.lng]);
+                    mapRsCircle.setRadius(rsSettings.radius);
+                }
+                updateLeafletUserMarker();
+            }, 200);
+        };
+
+        const updateLeafletUserMarker = () => {
+            if (leafletMap && mapUserMarker) {
+                mapUserMarker.setLatLng([simulatedPosition.lat, simulatedPosition.lng]);
+                
+                const bounds = L.latLngBounds([
+                    [rsSettings.lat, rsSettings.lng],
+                    [simulatedPosition.lat, simulatedPosition.lng]
+                ]);
+                leafletMap.fitBounds(bounds, { padding: [50, 50] });
+            }
+        };
+
+        // Distance calculation & inline Geofence validator
+        const checkGeofenceDistance = (lat1, lon1, lat2, lon2) => {
+            const R = 6371e3; // meters
+            const dLat = ((lat2 - lat1) * Math.PI) / 180;
+            const dLon = ((lon2 - lon1) * Math.PI) / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos((lat1 * Math.PI) / 180) *
+                    Math.cos((lat2 * Math.PI) / 180) *
+                    Math.sin(dLon / 2) *
+                    Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return Math.round(R * c);
+        };
+
+        const updateGPSStatusUI = (lat, lng) => {
+            const dist = checkGeofenceDistance(lat, lng, rsSettings.lat, rsSettings.lng);
+            currentRealDistance = dist;
+            const isInside = dist <= rsSettings.radius;
+
+            const banner = document.getElementById('gps-banner-inline');
+            const icon = document.getElementById('gps-banner-icon-inline');
+            const title = document.getElementById('gps-banner-title-inline');
+            const msg = document.getElementById('gps-banner-message-inline');
+
+            if (!banner) return;
+
+            if (isInside) {
+                banner.className = "p-4 rounded-2xl flex items-start space-x-3 border bg-emerald-50 border-emerald-200 text-emerald-950 animate-pulse";
+                icon.innerHTML = `<span class="text-emerald-600 text-sm"><i class="fa-solid fa-circle-check text-base"></i></span>`;
+                title.innerText = "Lokasi Valid: Di Dalam Jangkauan";
+                msg.innerHTML = `Jarak Anda: <b>${dist} meter</b> dari ${rsSettings.name}. (Batas aman radius: ${rsSettings.radius}m). Tombol presensi dibuka.`;
+            } else {
+                banner.className = "p-4 rounded-2xl flex items-start space-x-3 border bg-rose-50 border-rose-200 text-rose-950";
+                icon.innerHTML = `<span class="text-rose-500 text-sm"><i class="fa-solid fa-triangle-exclamation text-base animate-bounce"></i></span>`;
+                title.innerText = "Lokasi Tidak Valid: Di Luar Jangkauan";
+                msg.innerHTML = `Jarak Anda: <b>${dist} meter</b> dari ${rsSettings.name}. Presensi dikunci. Anda harus mendekati area rumah sakit (< ${rsSettings.radius}m).`;
+            }
+            validateAttendanceSubmitState();
+        };
+
+        const setSimulatedLocation = (mode) => {
+            const insideBtn = document.getElementById('btn-gps-inside-inline');
+            const outsideBtn = document.getElementById('btn-gps-outside-inline');
+
+            if (!insideBtn || !outsideBtn) return;
+
+            if (mode === 'inside') {
+                // Inside RS Aghisna Sidareja (Exactly ~6 meters)
+                simulatedPosition = { lat: -7.485310, lng: 108.799750 };
+                insideBtn.className = "py-2.5 px-3 bg-sky-500 text-white rounded-xl text-[10px] font-bold shadow-sm transition";
+                outsideBtn.className = "py-2.5 px-3 bg-white hover:bg-slate-50 border border-sky-100 text-slate-700 rounded-xl text-[10px] font-semibold transition";
+            } else {
+                // Outside RS Aghisna Sidareja (around 1.5km away)
+                simulatedPosition = { lat: -7.495000, lng: 108.810000 };
+                outsideBtn.className = "py-2.5 px-3 bg-sky-500 text-white rounded-xl text-[10px] font-bold shadow-sm transition";
+                insideBtn.className = "py-2.5 px-3 bg-white hover:bg-slate-50 border border-sky-100 text-slate-700 rounded-xl text-[10px] font-semibold transition";
+            }
+            updateGPSStatusUI(simulatedPosition.lat, simulatedPosition.lng);
+            updateLeafletUserMarker();
+        };
+
+        const getRealGPSLocation = () => {
+            if (!navigator.geolocation) {
+                openAlert("GPS Tidak Aktif", "Geolocation API tidak didukung di peranti Anda.");
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    simulatedPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    
+                    document.getElementById('btn-gps-inside-inline').className = "py-2.5 px-3 bg-white hover:bg-slate-50 border border-sky-100 text-slate-700 rounded-xl text-[10px] font-semibold transition";
+                    document.getElementById('btn-gps-outside-inline').className = "py-2.5 px-3 bg-white hover:bg-slate-50 border border-sky-100 text-slate-700 rounded-xl text-[10px] font-semibold transition";
+                    
+                    updateGPSStatusUI(pos.coords.latitude, pos.coords.longitude);
+                    updateLeafletUserMarker();
+                    openAlert("GPS Diperbarui", "Berhasil mendeteksi koordinat GPS aktual dari ponsel/PC Anda.");
+                },
+                (err) => {
+                    openAlert("Akses GPS Ditolak", "Gagal membaca lokasi asli. Pastikan Anda mengaktifkan dan mengizinkan GPS browser.");
+                },
+                { enableHighAccuracy: true }
+            );
+        };
+
+        // File Uploader Handler for leaves
+        let uploadedFileBase64 = null;
+        let uploadedFileName = '';
+
+        const handleLeaveFileUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            uploadedFileName = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedFileBase64 = e.target.result;
+                document.getElementById('file-upload-placeholder').innerHTML = `<span class="text-emerald-500"><i class="fa-solid fa-circle-check"></i> ${file.name}</span>`;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        // Real-Time Clock Update
+        const startLiveClock = () => {
+            setInterval(() => {
+                const clockEl = document.getElementById('live-time');
+                if (clockEl) {
+                    const now = new Date();
+                    clockEl.innerText = now.toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                    }) + `, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                }
+            }, 1000);
+        };
+
+        // Bottom Navigation bar setup
+        const buildRoleSubmenu = (role) => {
+            const container = document.getElementById('submenu-links-container');
+            const navBar = document.getElementById('app-submenu-bar');
+            container.innerHTML = '';
+
+            let tabs = [];
+            if (role === 'karyawan') {
+                navBar.className = "fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] bg-white/95 backdrop-blur-md border border-sky-100 shadow-[0_12px_40px_-5px_rgba(14,165,233,0.22)] rounded-[30px] p-2 flex items-center justify-center transition-all duration-300 w-[200px]";
+                tabs = [
+                    { id: 'beranda', onClick: "switchKaryawanTab('beranda')", svg: `<i class="fa-solid fa-house-medical text-base"></i>`, label: "Beranda" },
+                    { id: 'presensi', onClick: "switchKaryawanTab('presensi')", svg: `<i class="fa-solid fa-camera-retro text-base"></i>`, label: "Ambil Presensi" },
+                    { id: 'profil', onClick: "switchKaryawanTab('profil')", svg: `<i class="fa-solid fa-user-doctor text-base"></i>`, label: "Profil" }
+                ];
+            } else if (role === 'admin') {
+                navBar.className = "fixed bottom-6 left-1/2 -translate-x-1/2 z-[999] bg-white/95 backdrop-blur-md border border-sky-100 shadow-[0_12px_40px_-5px_rgba(14,165,233,0.22)] rounded-[30px] p-2 flex items-center justify-center transition-all duration-300 w-[300px]";
+                tabs = [
+                    { id: 'dashboard', onClick: "switchAdminTab('dashboard')", svg: `<i class="fa-solid fa-chart-line text-sm"></i>`, label: "Dashboard Overview" },
+                    { id: 'karyawan', onClick: "switchAdminTab('karyawan')", svg: `<i class="fa-solid fa-users text-sm"></i>`, label: "Kelola Pegawai" },
+                    { id: 'absensi', onClick: "switchAdminTab('absensi')", svg: `<i class="fa-solid fa-clipboard-list text-sm"></i>`, label: "Rekap Presensi" },
+                    { id: 'bantuan', onClick: "switchAdminTab('bantuan')", svg: `<i class="fa-solid fa-headset text-sm"></i>`, label: "Tiket Bantuan" },
+                    { id: 'setting', onClick: "switchAdminTab('setting')", svg: `<i class="fa-solid fa-gears text-sm"></i>`, label: "Pengaturan Geofence" },
+                    { id: 'guide', onClick: "switchAdminTab('guide')", svg: `<i class="fa-solid fa-code text-sm"></i>`, label: "Integrasi Database (PHP)" }
+                ];
+            }
+
+            tabs.forEach((tab, index) => {
+                const button = document.createElement('button');
+                button.id = `sublink-${tab.id}`;
+                button.setAttribute('onclick', tab.onClick);
+                button.className = "relative group w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center " +
+                                   (index === 0 ? "bg-sky-500 text-white shadow-md shadow-sky-200" : "text-sky-700 hover:bg-sky-100");
+                button.innerHTML = `
+                    ${tab.svg}
+                    <div class="absolute bottom-14 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition-all duration-200 bg-slate-900/95 text-white text-[10px] font-semibold px-2.5 py-1.5 rounded-xl whitespace-nowrap pointer-events-none shadow-lg z-[1000] mb-1">
+                        ${tab.label}
+                        <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900/95 rotate-45"></div>
+                    </div>
+                `;
+                container.appendChild(button);
+            });
+
+            navBar.classList.remove('hidden');
+        };
+
+        const highlightActiveSublink = (activeId, allIds) => {
+            allIds.forEach(id => {
+                const el = document.getElementById(`sublink-${id}`);
+                if (el) {
+                    if (id === activeId) {
+                        el.className = "relative group w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center bg-sky-500 text-white shadow-md shadow-sky-200";
+                    } else {
+                        el.className = "relative group w-10 h-10 rounded-full transition-all duration-300 flex items-center justify-center text-sky-700 hover:bg-sky-100";
+                    }
+                }
+            });
+        };
+
+        const switchKaryawanTab = (tabName) => {
+            document.getElementById('karyawan-panel-beranda').classList.add('hidden');
+            document.getElementById('karyawan-panel-presensi').classList.add('hidden');
+            document.getElementById('karyawan-panel-profil').classList.add('hidden');
+
+            document.getElementById(`karyawan-panel-${tabName}`).classList.remove('hidden');
+            highlightActiveSublink(tabName, ['beranda', 'presensi', 'profil']);
+
+            if (tabName !== 'presensi') {
+                stopWebcamInline();
+            } else {
+                initPresensiMap();
+                setSimulatedLocation('inside');
+            }
+
+            if (tabName === 'beranda') {
+                setTimeout(renderPersonalAnalyticsChart, 50);
+            }
+            if (tabName === 'profil') {
+                setTimeout(renderPersonalTrendLineChart, 100);
+            }
+        };
+
+        const switchAdminTab = (tabName) => {
+            document.getElementById('adm-panel-dashboard').classList.add('hidden');
+            document.getElementById('adm-panel-karyawan').classList.add('hidden');
+            document.getElementById('adm-panel-absensi').classList.add('hidden');
+            document.getElementById('adm-panel-bantuan').classList.add('hidden');
+            document.getElementById('adm-panel-setting').classList.add('hidden');
+            document.getElementById('adm-panel-guide').classList.add('hidden');
+
+            document.getElementById(`adm-panel-${tabName}`).classList.remove('hidden');
+            highlightActiveSublink(tabName, ['dashboard', 'karyawan', 'absensi', 'bantuan', 'setting', 'guide']);
+
+            if (tabName === 'karyawan') renderEmployeeCRUDTable();
+            if (tabName === 'absensi') applyAttendanceFilters();
+            if (tabName === 'dashboard') {
+                renderAdminDashboardOverview();
+                setTimeout(renderAdminWeeklyChart, 50);
+            }
+            if (tabName === 'bantuan') renderAdminHelpTickets();
+        };
+
+        // Authentications
+        const doLogin = (e) => {
+            if (e) e.preventDefault();
+            const nipVal = document.getElementById('login-nip').value.trim();
+            const passVal = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+
+            errEl.classList.add('hidden');
+            const foundUser = employees.find(emp => emp.nip === nipVal);
+
+            if (foundUser && foundUser.password === passVal) {
+                currentUser = foundUser;
+                document.getElementById('header-user-name').innerText = foundUser.name;
+                document.getElementById('header-user').classList.remove('hidden');
+                document.getElementById('view-login').classList.add('hidden');
+
+                if (foundUser.nip === '19800202') {
+                    document.getElementById('view-admin').classList.remove('hidden');
+                    buildRoleSubmenu('admin');
+                    switchAdminTab('dashboard');
+                } else {
+                    document.getElementById('view-karyawan').classList.remove('hidden');
+                    buildRoleSubmenu('karyawan');
+                    setupEmployeePortal();
+                    switchKaryawanTab('beranda');
+                }
+            } else {
+                errEl.classList.remove('hidden');
+            }
+        };
+
+        const doLogout = () => {
+            currentUser = null;
+            document.getElementById('header-user').classList.add('hidden');
+            document.getElementById('view-karyawan').classList.add('hidden');
+            document.getElementById('view-admin').classList.add('hidden');
+            document.getElementById('app-submenu-bar').classList.add('hidden');
+            document.getElementById('view-login').classList.remove('hidden');
+            
+            document.getElementById('login-nip').value = '';
+            document.getElementById('login-password').value = '';
+            stopWebcamInline();
+        };
+
+        // User Change Password Handler
+        const changeUserPassword = (e) => {
+            e.preventDefault();
+            const oldPwd = document.getElementById('pwd-old').value;
+            const newPwd = document.getElementById('pwd-new').value;
+            const confPwd = document.getElementById('pwd-confirm').value;
+
+            if (currentUser.password !== oldPwd) {
+                openAlert("Sandi Salah", "Kata sandi lama yang Anda masukkan tidak cocok.");
+                return;
+            }
+            if (newPwd !== confPwd) {
+                openAlert("Konfirmasi Salah", "Konfirmasi sandi baru tidak cocok.");
+                return;
+            }
+
+            employees = employees.map(emp => {
+                if (emp.nip === currentUser.nip) {
+                    emp.password = newPwd;
+                    currentUser.password = newPwd;
+                }
+                return emp;
+            });
+            saveToStorage('rs_employees', employees);
+
+            document.getElementById('pwd-old').value = '';
+            document.getElementById('pwd-new').value = '';
+            document.getElementById('pwd-confirm').value = '';
+
+            closePasswordModal();
+            openAlert("Sandi Diupdate", "Kata sandi keamanan Anda berhasil diperbarui.");
+        };
+
+        // User update phone/email handler
+        const updateUserContacts = (e) => {
+            e.preventDefault();
+            const phone = document.getElementById('contact-phone').value.trim();
+            const email = document.getElementById('contact-email').value.trim();
+
+            employees = employees.map(emp => {
+                if (emp.nip === currentUser.nip) {
+                    emp.phone = phone;
+                    emp.email = email;
+                    currentUser.phone = phone;
+                    currentUser.email = email;
+                }
+                return emp;
+            });
+            saveToStorage('rs_employees', employees);
+
+            document.getElementById('profile-phone').innerText = `📞 Telepon: ${phone}`;
+            document.getElementById('profile-email').innerText = `📧 Email: ${email}`;
+
+            closeContactModal();
+            openAlert("Profil Diupdate", "Nomor telepon dan email dinas berhasil disimpan.");
+        };
+
+        // Submit Help Desk Ticket (IT Support)
+        const submitHelpRequest = (e) => {
+            e.preventDefault();
+            const subject = document.getElementById('help-subject').value.trim();
+            const message = document.getElementById('help-message').value.trim();
+
+            const newTicket = {
+                id: Date.now(),
+                nip: currentUser.nip,
+                name: currentUser.name,
+                subject: subject,
+                message: message,
+                status: 'Menunggu'
+            };
+
+            helpTickets.unshift(newTicket);
+            saveToStorage('rs_help_tickets', helpTickets);
+
+            document.getElementById('help-subject').value = '';
+            document.getElementById('help-message').value = '';
+
+            closeHelpSupportModal();
+            openAlert("Tiket Terkirim", "Laporan dikirimkan ke IT Support. Admin/IT akan segera meninjau laporan Anda.");
+        };
+
+        // Camera Inline Control Handlers
+        let localStream = null;
+        let isCameraRunning = false;
+        let imageCapturedData = null;
+        let isFlashActive = false;
+
+        const toggleCameraFlashInline = () => {
+            const overlay = document.getElementById('camera-flash-overlay-inline');
+            const flashIcon = document.getElementById('flash-icon-inline');
+            if (!overlay) return;
+
+            isFlashActive = !isFlashActive;
+            if (isFlashActive) {
+                overlay.style.opacity = '0.35'; 
+                flashIcon.className = "fa-solid fa-bolt text-amber-500";
+            } else {
+                overlay.style.opacity = '0';
+                flashIcon.className = "fa-solid fa-bolt text-slate-600";
+            }
+        };
+
+        const triggerCameraFlashOnCaptureInline = () => {
+            const overlay = document.getElementById('camera-flash-overlay-inline');
+            if (!overlay) return;
+            overlay.style.opacity = '1';
+            setTimeout(() => {
+                overlay.style.opacity = isFlashActive ? '0.35' : '0';
+            }, 200);
+        };
+
+        const startWebcamInline = async () => {
+            const videoEl = document.getElementById('webcam-video-inline');
+            const fallbackEl = document.getElementById('webcam-fallback-inline');
+            const capturedEl = document.getElementById('webcam-captured-inline');
+            const guideline = document.getElementById('webcam-guideline-inline');
+            const cameraBtnText = document.getElementById('camera-btn-text-inline');
+
+            videoEl.classList.add('hidden');
+            fallbackEl.classList.remove('hidden');
+            capturedEl.classList.add('hidden');
+            guideline.classList.add('hidden');
+            imageCapturedData = null;
+
+            document.getElementById('camera-prompt-text-inline').innerText = "Mengakses Kamera...";
+
+            try {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                    videoEl.srcObject = localStream;
+                    videoEl.classList.remove('hidden');
+                    fallbackEl.classList.add('hidden');
+                    guideline.classList.remove('hidden');
+                    isCameraRunning = true;
+                    cameraBtnText.innerText = "Ambil Swafoto";
+                } else {
+                    isCameraRunning = false;
+                    triggerCameraFallbackStateInline();
+                }
+            } catch (err) {
+                isCameraRunning = false;
+                triggerCameraFallbackStateInline();
+            }
+        };
+
+        const triggerCameraFallbackStateInline = () => {
+            const videoEl = document.getElementById('webcam-video-inline');
+            const fallbackEl = document.getElementById('webcam-fallback-inline');
+            const guideline = document.getElementById('webcam-guideline-inline');
+            const cameraBtnText = document.getElementById('camera-btn-text-inline');
+            
+            videoEl.classList.add('hidden');
+            fallbackEl.classList.remove('hidden');
+            guideline.className = "absolute inset-0 border-[3px] border-dashed border-sky-400 opacity-20 m-6 rounded-full pointer-events-none hidden";
+            document.getElementById('camera-prompt-text-inline').innerText = "Kamera Simulator Aktif";
+            cameraBtnText.innerText = "Simulasi Ambil Foto";
+        };
+
+        const stopWebcamInline = () => {
+            const videoEl = document.getElementById('webcam-video-inline');
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (videoEl) videoEl.srcObject = null;
+            isCameraRunning = false;
+            
+            const cameraBtnText = document.getElementById('camera-btn-text-inline');
+            if (cameraBtnText) cameraBtnText.innerText = "Nyalakan Kamera";
+        };
+
+        const toggleWebcamStateInline = () => {
+            const videoEl = document.getElementById('webcam-video-inline');
+            const capturedEl = document.getElementById('webcam-captured-inline');
+            const fallbackEl = document.getElementById('webcam-fallback-inline');
+            const guideline = document.getElementById('webcam-guideline-inline');
+            const cameraBtnText = document.getElementById('camera-btn-text-inline');
+
+            if (!isCameraRunning && !imageCapturedData) {
+                startWebcamInline();
+                return;
+            }
+
+            if (isCameraRunning && !imageCapturedData) {
+                triggerCameraFlashOnCaptureInline();
+                if (videoEl && !videoEl.classList.contains('hidden')) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = videoEl.videoWidth || 640;
+                    canvas.height = videoEl.videoHeight || 480;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                    imageCapturedData = canvas.toDataURL('image/jpeg');
+                    capturedEl.src = imageCapturedData;
+                    capturedEl.classList.remove('hidden');
+                    videoEl.classList.add('hidden');
+                    guideline.classList.add('hidden');
+                } else {
+                    const medicalAvatars = [
+                        "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=250",
+                        "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=250",
+                        "https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=250"
+                    ];
+                    imageCapturedData = medicalAvatars[Math.floor(Math.random() * medicalAvatars.length)];
+                    capturedEl.src = imageCapturedData;
+                    capturedEl.classList.remove('hidden');
+                    fallbackEl.classList.add('hidden');
+                }
+                stopWebcamInline();
+                cameraBtnText.innerText = "Ulangi Swafoto";
+                validateAttendanceSubmitState();
+                return;
+            }
+
+            if (imageCapturedData) {
+                imageCapturedData = null;
+                capturedEl.classList.add('hidden');
+                startWebcamInline();
+                validateAttendanceSubmitState();
+            }
+        };
+
+        const validateAttendanceSubmitState = () => {
+            const submitBtn = document.getElementById('btn-submit-attendance-inline');
+            if (!submitBtn) return;
+
+            const isInside = currentRealDistance <= rsSettings.radius;
+            if (isInside && imageCapturedData) {
+                submitBtn.className = "w-full mt-4 py-3.5 rounded-2xl font-bold text-xs bg-sky-500 hover:bg-sky-600 text-white shadow-md transition cursor-pointer";
+            } else {
+                submitBtn.className = "w-full mt-4 py-3.5 rounded-2xl font-bold text-xs bg-sky-400/80 hover:bg-sky-500 text-white shadow-md transition cursor-pointer";
+            }
+        };
+
+        const setupEmployeePortal = () => {
+            document.getElementById('user-initial').innerText = currentUser.name.charAt(0);
+            document.getElementById('user-fullname').innerText = currentUser.name;
+            document.getElementById('user-details').innerText = `${currentUser.role} | ${currentUser.department}`;
+
+            // Profile Tab setup
+            document.getElementById('profile-avatar-initial').innerText = currentUser.name.charAt(0);
+            document.getElementById('profile-fullname').innerText = currentUser.name;
+            document.getElementById('profile-nip').innerText = `NIP: ${currentUser.nip}`;
+            document.getElementById('profile-dept').innerText = currentUser.department;
+            document.getElementById('profile-role').innerText = currentUser.role;
+            document.getElementById('profile-phone').innerText = `📞 Telepon: ${currentUser.phone || '081234567890'}`;
+            document.getElementById('profile-email').innerText = `📧 Email: ${currentUser.email || 'sarah@aghisna.id'}`;
+
+            // Leave Progress SOP visualization
+            const leaveTaken = currentUser.leave_taken || 0;
+            document.getElementById('leave-taken-label').innerText = `${leaveTaken} / 12 Hari`;
+            document.getElementById('leave-taken-progress').style.width = `${(leaveTaken / 12) * 100}%`;
+
+            renderCalendarTracker();
+            renderAnnouncements();
+            setTimeout(() => {
+                renderPersonalAnalyticsChart();
+            }, 50);
+        };
+
+        // Chart.js personal summary doughnut chart
+        const renderPersonalAnalyticsChart = () => {
+            const ctx = document.getElementById('personal-attendance-chart');
+            if (!ctx) return;
+
+            const myAttends = attendanceHistory.filter(h => h.nip === currentUser.nip);
+            const myLeaves = leaveRequests.filter(l => l.nip === currentUser.nip);
+
+            const tepatWaktuCount = myAttends.filter(a => a.status === 'Tepat Waktu').length;
+            const terlambatCount = myAttends.filter(a => a.status === 'Terlambat').length;
+            const izinCount = myLeaves.length;
+
+            if (personalChartInstance) {
+                personalChartInstance.destroy();
+            }
+
+            personalChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Tepat Waktu', 'Terlambat', 'Izin/Cuti'],
+                    datasets: [{
+                        data: [tepatWaktuCount || 1, terlambatCount || 0, izinCount || 0],
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 10, family: 'Inter' },
+                                boxWidth: 10
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        // Chart.js personal presence trend line chart
+        const renderPersonalTrendLineChart = () => {
+            const ctx = document.getElementById('personal-trend-line-chart');
+            if (!ctx) return;
+
+            const myAttends = attendanceHistory.filter(h => h.nip === currentUser.nip).slice(0, 7).reverse();
+
+            const labels = myAttends.map(item => item.time.split(',')[0]); 
+            const distances = myAttends.map(item => item.distance); 
+
+            if (personalLineChartInstance) {
+                personalLineChartInstance.destroy();
+            }
+
+            const chartCtx = ctx.getContext('2d');
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+            personalLineChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['01 Jun', '03 Jun', '05 Jun', '08 Jun', '10 Jun'],
+                    datasets: [{
+                        label: 'Jarak Verifikasi GPS (Meter)',
+                        data: distances.length ? distances : [14, 8, 12, 35, 15],
+                        borderColor: '#0284c7',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#0284c7',
+                        pointHoverBackgroundColor: '#ffffff',
+                        pointHoverBorderColor: '#0284c7',
+                        pointHoverBorderWidth: 2,
+                        pointRadius: 4,
+                        fill: true,
+                        backgroundColor: gradient,
+                        tension: 0.35 
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 9, family: 'Inter' } }
+                        },
+                        y: {
+                            grid: { color: '#f1f5f9' },
+                            ticks: { font: { size: 9, family: 'Inter' } }
+                        }
+                    }
+                }
+            });
+        };
+
+        const renderCalendarTracker = () => {
+            const grid = document.getElementById('calendar-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const targetYear = 2026;
+            const targetMonth = 5; 
+
+            const firstDayIndex = new Date(targetYear, targetMonth, 1).getDay(); 
+            let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+            const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+
+            for (let i = 0; i < startOffset; i++) {
+                const emptyCell = document.createElement('div');
+                grid.appendChild(emptyCell);
+            }
+
+            const myAttends = attendanceHistory.filter(h => h.nip === currentUser.nip);
+            const myLeaves = leaveRequests.filter(l => l.nip === currentUser.nip);
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayCell = document.createElement('div');
+                dayCell.className = "aspect-square flex flex-col items-center justify-center text-[11px] font-bold rounded-xl transition relative cursor-pointer";
+                dayCell.innerHTML = `<span>${day}</span>`;
+
+                const currentDateStr = `${String(day).padStart(2, '0')} Jun 2026`;
+                const currentDateISO = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                const dayAttend = myAttends.find(item => item.time.includes(currentDateStr));
+                const dayLeave = myLeaves.find(leave => currentDateISO >= leave.dateStart && currentDateISO <= leave.dateEnd);
+
+                if (dayAttend) {
+                    if (dayAttend.status === 'Tepat Waktu') {
+                        dayCell.className += " bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-sm";
+                        dayCell.innerHTML += `<span class="absolute bottom-1 w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>`;
+                    } else {
+                        dayCell.className += " bg-amber-100 text-amber-800 border border-amber-300 shadow-sm";
+                        dayCell.innerHTML += `<span class="absolute bottom-1 w-1.5 h-1.5 bg-amber-500 rounded-full"></span>`;
+                    }
+                } else if (dayLeave) {
+                    dayCell.className += " bg-rose-100 text-rose-800 border border-rose-300 shadow-sm";
+                    dayCell.innerHTML += `<span class="absolute bottom-1 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>`;
+                } else {
+                    dayCell.className += " text-slate-700 bg-white border border-slate-100 hover:bg-sky-50";
+                }
+
+                grid.appendChild(dayCell);
+            }
+        };
+
+        const submitAttendanceProcessInline = () => {
+            const isInside = currentRealDistance <= rsSettings.radius;
+            
+            if (!isInside) {
+                openAlert("Presensi Gagal", "Maaf, Presensi Gagal. Anda terdeteksi berada di luar jangkauan wilayah RS Aghisna Medika Sidareja. Silakan mendekat ke area rumah sakit.");
+                return;
+            }
+
+            if (!imageCapturedData) {
+                openAlert("Foto Selfie Dibutuhkan", "Harap nyalakan kamera dan ambil swafoto Anda terlebih dahulu.");
+                return;
+            }
+
+            const type = document.getElementById('attendance-type-select-inline').value;
+            const shift = document.getElementById('attendance-shift-select-inline').value;
+            
+            const now = new Date();
+            const formattedTime = now.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            }) + `, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            let isLate = false;
+            if (type === 'Masuk' && shift === 'Pagi' && now.getHours() >= 8) isLate = true;
+            if (type === 'Masuk' && shift === 'Siang' && now.getHours() >= 15) isLate = true;
+            const status = isLate ? 'Terlambat' : 'Tepat Waktu';
+
+            const newRecord = {
+                id: Date.now(),
+                nip: currentUser.nip,
+                name: currentUser.name,
+                type: type,
+                shift: shift,
+                time: formattedTime,
+                status: status,
+                distance: currentRealDistance,
+                lat: simulatedPosition.lat,
+                lng: simulatedPosition.lng,
+                photo: imageCapturedData
+            };
+
+            attendanceHistory.unshift(newRecord);
+            saveToStorage('rs_attendance', attendanceHistory);
+
+            openAlert("Sukses Absensi", `Aktivitas presensi ${type} untuk dinas ${shift} berhasil terekam.`);
+            
+            imageCapturedData = null;
+            document.getElementById('webcam-captured-inline').classList.add('hidden');
+            document.getElementById('webcam-fallback-inline').classList.remove('hidden');
+            document.getElementById('camera-prompt-text-inline').innerText = "Kamera Belum Aktif";
+            
+            setupEmployeePortal();
+            switchKaryawanTab('beranda');
+        };
+
+        const submitLeaveRequest = (e) => {
+            e.preventDefault();
+            const type = document.getElementById('leave-type').value;
+            const start = document.getElementById('leave-start').value;
+            const end = document.getElementById('leave-end').value;
+            const desc = document.getElementById('leave-desc').value;
+
+            const startD = new Date(start);
+            const endD = new Date(end);
+            const totalDays = Math.ceil((endD - startD) / (1000 * 60 * 60 * 24)) + 1;
+
+            if (type === 'Cuti' && (currentUser.leave_taken + totalDays > 12)) {
+                openAlert("Gagal Pengajuan", `Sisa kuota cuti tahunan Anda tidak mencukupi untuk mengambil dispensasi ${totalDays} hari ini.`);
+                return;
+            }
+
+            const newLeave = {
+                id: Date.now(),
+                nip: currentUser.nip,
+                name: currentUser.name,
+                type: type,
+                dateStart: start,
+                dateEnd: end,
+                description: desc,
+                status: 'Disetujui',
+                attachmentName: uploadedFileName || null
+            };
+
+            leaveRequests.unshift(newLeave);
+            saveToStorage('rs_leaves', leaveRequests);
+
+            if (type === 'Cuti') {
+                employees = employees.map(emp => {
+                    if (emp.nip === currentUser.nip) {
+                        emp.leave_taken = (emp.leave_taken || 0) + totalDays;
+                        currentUser.leave_taken = emp.leave_taken;
+                    }
+                    return emp;
+                });
+                saveToStorage('rs_employees', employees);
+            }
+
+            openAlert("Form Terkirim", `Permohonan dispensasi ${type} sukses disimpan dan disetujui HRD.`);
+            document.getElementById('leave-desc').value = '';
+            closeDispensasiModal();
+            setupEmployeePortal();
+        };
+
+        const renderAdminDashboardOverview = () => {
+            document.getElementById('adm-stat-employees').innerText = employees.length;
+            document.getElementById('adm-stat-attendance').innerText = attendanceHistory.length;
+            document.getElementById('adm-stat-leaves').innerText = leaveRequests.length;
+
+            renderAnnouncements();
+
+            const recentLogsContainer = document.getElementById('adm-recent-logs');
+            recentLogsContainer.innerHTML = '';
+
+            if (attendanceHistory.length === 0) {
+                recentLogsContainer.innerHTML = `<p class="text-xs text-slate-400 py-3">Belum ada log presensi masuk hari ini.</p>`;
+                return;
+            }
+
+            attendanceHistory.slice(0, 3).forEach(item => {
+                const div = document.createElement('div');
+                div.className = "p-3.5 bg-slate-50 hover:bg-sky-50/50 rounded-2xl border border-sky-100 flex items-center justify-between text-xs transition animate-in fade-in duration-200";
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2.5">
+                        <img src="${item.photo}" class="w-8 h-8 rounded-full object-cover border border-sky-250" />
+                        <div>
+                            <p class="font-bold text-slate-800">${item.name}</p>
+                            <p class="text-[10px] text-slate-400">Absen ${item.type} | ${item.shift} | ${item.time}</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded font-bold text-[9px] uppercase ${item.status === 'Tepat Waktu' ? 'bg-sky-100 text-sky-800' : 'bg-rose-100 text-rose-800'}">
+                        ${item.status}
+                    </span>
+                `;
+                recentLogsContainer.appendChild(div);
+            });
+        };
+
+        // Render Chart for Admin
+        const renderAdminWeeklyChart = () => {
+            const ctx = document.getElementById('admin-weekly-chart');
+            if (!ctx) return;
+
+            if (adminChartInstance) {
+                adminChartInstance.destroy();
+            }
+
+            adminChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'],
+                    datasets: [
+                        {
+                            label: 'Tepat Waktu',
+                            data: [12, 14, 15, 11, 13, 8, 9],
+                            backgroundColor: '#38bdf8'
+                        },
+                        {
+                            label: 'Terlambat',
+                            data: [2, 1, 3, 0, 2, 1, 0],
+                            backgroundColor: '#fbbf24'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { font: { size: 10, family: 'Inter' } } }
+                    },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { grid: { color: '#f1f5f9' } }
+                    }
+                }
+            });
+        };
+
+        // Render IT Help Tickets in Admin Panel
+        const renderAdminHelpTickets = () => {
+            const container = document.getElementById('adm-help-tickets-container');
+            container.innerHTML = '';
+
+            if (helpTickets.length === 0) {
+                container.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">Tidak ada tiket bantuan teknis yang masuk.</p>`;
+                return;
+            }
+
+            helpTickets.forEach(ticket => {
+                const emp = employees.find(e => e.nip === ticket.nip);
+                const phone = emp ? emp.phone : '-';
+
+                const div = document.createElement('div');
+                div.className = "p-4 bg-slate-50 hover:bg-slate-100 rounded-3xl border border-sky-100 text-xs space-y-3 transition animate-in fade-in duration-200";
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-extrabold text-slate-800">${ticket.name}</p>
+                            <p class="text-[10px] text-slate-400">NIP: ${ticket.nip} | Hubungi: ${phone}</p>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase ${ticket.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                            ${ticket.status}
+                        </span>
+                    </div>
+                    <div class="p-3 bg-white rounded-2xl border border-sky-50 space-y-1">
+                        <p class="font-bold text-sky-950 text-[11px]">${ticket.subject}</p>
+                        <p class="text-slate-500 text-[10px] leading-relaxed">"${ticket.message}"</p>
+                    </div>
+                    ${ticket.status === 'Menunggu' ? `
+                    <div class="flex justify-end space-x-1.5">
+                        <button onclick="resolveHelpTicket(${ticket.id})" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition font-bold text-[10px]">Tandai Selesai</button>
+                    </div>` : ''}
+                `;
+                container.appendChild(div);
+            });
+        };
+
+        const resolveHelpTicket = (id) => {
+            helpTickets = helpTickets.map(ticket => {
+                if (ticket.id === id) {
+                    ticket.status = 'Selesai';
+                }
+                return ticket;
+            });
+            saveToStorage('rs_help_tickets', helpTickets);
+            renderAdminHelpTickets();
+            openAlert("Selesai", "Tiket bantuan berhasil ditandai selesai.");
+        };
+
+        // CRUD: Render Employees list in table
+        const renderEmployeeCRUDTable = () => {
+            const body = document.getElementById('adm-employee-table-body');
+            body.innerHTML = '';
+
+            employees.forEach(emp => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-sky-50/60 hover:bg-sky-50/20";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-600">${emp.nip}</td>
+                    <td class="p-3 font-bold text-slate-800">${emp.name}</td>
+                    <td class="p-3 text-slate-500">${emp.role} | <span class="text-sky-700 font-semibold">${emp.department}</span></td>
+                    <td class="p-3 text-slate-500">📞 ${emp.phone || '-'}<br>📧 ${emp.email || '-'}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex justify-center space-x-1">
+                            <button onclick="prepareEditEmployee('${emp.nip}')" class="px-2.5 py-1 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-lg transition font-bold text-[10px]">Edit</button>
+                            <button onclick="deleteEmployee('${emp.nip}')" class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition font-bold text-[10px]">Hapus</button>
+                        </div>
+                    </td>
+                `;
+                body.appendChild(tr);
+            });
+        };
+
+        const submitEmployeeCRUD = (e) => {
+            e.preventDefault();
+            const idVal = document.getElementById('crud-id').value;
+            const nip = document.getElementById('crud-nip').value.trim();
+            const name = document.getElementById('crud-name').value.trim();
+            const role = document.getElementById('crud-role').value.trim();
+            const dept = document.getElementById('crud-dept').value.trim();
+            const pass = document.getElementById('crud-pass').value;
+            const phone = document.getElementById('crud-phone').value.trim() || '081234567890';
+            const email = document.getElementById('crud-email').value.trim() || 'staf@aghisna.id';
+            const leave = parseInt(document.getElementById('crud-leave').value) || 0;
+
+            if (idVal) {
+                employees = employees.map(emp => {
+                    if (emp.nip === idVal) {
+                        return { nip, name, role, department: dept, password: pass, phone, email, leave_taken: leave };
+                    }
+                    return emp;
+                });
+                openAlert("Profil Diupdate", "Perubahan profil data staf berhasil disimpan.");
+            } else {
+                if (employees.some(emp => emp.nip === nip)) {
+                    openAlert("NIP Terdaftar", "Nomor Induk Pegawai tersebut sudah ada.");
+                    return;
+                }
+                employees.push({ nip, name, role, department: dept, password: pass, phone, email, leave_taken: leave });
+                openAlert("Staf Ditambah", "Staf medis baru sukses didaftarkan.");
+            }
+
+            saveToStorage('rs_employees', employees);
+            clearEmployeeForm();
+            renderEmployeeCRUDTable();
+        };
+
+        const prepareEditEmployee = (nip) => {
+            const emp = employees.find(e => e.nip === nip);
+            if (!emp) return;
+
+            document.getElementById('crud-id').value = emp.nip;
+            document.getElementById('crud-nip').value = emp.nip;
+            document.getElementById('crud-name').value = emp.name;
+            document.getElementById('crud-role').value = emp.role;
+            document.getElementById('crud-dept').value = emp.department;
+            document.getElementById('crud-pass').value = emp.password;
+            document.getElementById('crud-phone').value = emp.phone || '';
+            document.getElementById('crud-email').value = emp.email || '';
+            document.getElementById('crud-leave').value = emp.leave_taken || 0;
+        };
+
+        const deleteEmployee = (nip) => {
+            if (nip === '19800202') {
+                openAlert("Gagal", "Akun HRD Utama tidak boleh dihapus.");
+                return;
+            }
+            employees = employees.filter(e => e.nip !== nip);
+            saveToStorage('rs_employees', employees);
+            renderEmployeeCRUDTable();
+            openAlert("Pegawai Dihapus", "Pegawai telah terhapus dari database.");
+        };
+
+        const clearEmployeeForm = () => {
+            document.getElementById('crud-id').value = '';
+            document.getElementById('crud-nip').value = '';
+            document.getElementById('crud-name').value = '';
+            document.getElementById('crud-role').value = '';
+            document.getElementById('crud-dept').value = '';
+            document.getElementById('crud-pass').value = '';
+            document.getElementById('crud-phone').value = '';
+            document.getElementById('crud-email').value = '';
+            document.getElementById('crud-leave').value = '';
+        };
+
+        const applyAttendanceFilters = () => {
+            const query = document.getElementById('filter-search').value.toLowerCase();
+            const deptQuery = document.getElementById('filter-dept').value.toLowerCase();
+            const statusFilter = document.getElementById('filter-status').value;
+
+            const container = document.getElementById('adm-filtered-logs-container');
+            container.innerHTML = '';
+
+            const filtered = attendanceHistory.filter(item => {
+                const matchesSearch = item.name.toLowerCase().includes(query) || item.nip.includes(query);
+                
+                const emp = employees.find(e => e.nip === item.nip);
+                const department = emp ? emp.department.toLowerCase() : 'sekretariat';
+                const matchesDept = department.includes(deptQuery);
+
+                const matchesStatus = (statusFilter === 'Semua') || (item.status === statusFilter);
+
+                return matchesSearch && matchesDept && matchesStatus;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 py-6 text-center">Tidak ditemukan rekap absensi yang cocok.</p>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "p-4 bg-slate-50 hover:bg-slate-100 rounded-3xl border border-sky-100 text-xs space-y-3 transition animate-in fade-in duration-200";
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center space-x-2.5">
+                            <img src="${item.photo}" class="w-10 h-10 rounded-full object-cover border border-sky-250 shadow-sm" />
+                            <div>
+                                <p class="font-extrabold text-slate-800">${item.name}</p>
+                                <p class="text-[10px] text-slate-400">NIP: ${item.nip}</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase ${item.status === 'Tepat Waktu' ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800'}">
+                            ${item.status}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] pt-1.5 border-t border-slate-150 text-slate-500">
+                        <p>Absen: <strong class="text-slate-700">${item.type}</strong></p>
+                        <p>Shift: <strong class="text-slate-700">${item.shift}</strong></p>
+                        <p>Waktu: <strong class="text-slate-700">${item.time}</strong></p>
+                    </div>
+                    <div class="p-2 bg-white rounded-xl border border-sky-50 flex justify-between items-center text-[10px] text-slate-500">
+                        <span>📍 GPS: ${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</span>
+                        <span class="font-bold text-sky-800">📏 Jarak Absen: ${item.distance}m</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        };
+
+        const renderAnnouncements = () => {
+            const userList = document.getElementById('user-announcements-list');
+            if (userList) {
+                userList.innerHTML = '';
+                if (announcements.length === 0) {
+                    userList.innerHTML = `<p class="text-xs text-slate-400 italic">Tidak ada pengumuman terbaru.</p>`;
+                } else {
+                    announcements.forEach(ann => {
+                        const div = document.createElement('div');
+                        div.className = "p-4 bg-sky-50/50 rounded-2xl border border-sky-100 space-y-1 animate-in fade-in duration-200";
+                        div.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <h5 class="text-xs font-extrabold text-sky-950">${ann.title}</h5>
+                                <span class="text-[9px] font-semibold text-slate-400">${ann.date}</span>
+                            </div>
+                            <p class="text-[11px] text-slate-600 leading-relaxed">${ann.content}</p>
+                        `;
+                        userList.appendChild(div);
+                    });
+                }
+            }
+
+            const adminList = document.getElementById('adm-announcements-list');
+            if (adminList) {
+                adminList.innerHTML = '';
+                if (announcements.length === 0) {
+                    adminList.innerHTML = `<p class="text-xs text-slate-400 italic text-center py-4">Belum ada pengumuman yang diterbitkan.</p>`;
+                } else {
+                    announcements.forEach(ann => {
+                        const div = document.createElement('div');
+                        div.className = "p-4 bg-white hover:bg-slate-50/50 rounded-2xl border border-sky-100 shadow-sm flex items-start justify-between gap-4 text-xs transition duration-200 animate-in fade-in duration-300";
+                        div.innerHTML = `
+                            <div class="space-y-1 flex-1">
+                                <div class="flex items-center space-x-2">
+                                    <span class="w-2 h-2 bg-sky-500 rounded-full"></span>
+                                    <p class="font-extrabold text-slate-800 text-xs">${ann.title}</p>
+                                </div>
+                                <p class="text-[10px] text-slate-500 leading-relaxed font-medium pl-4">${ann.content}</p>
+                                <p class="text-[9px] text-slate-400 pl-4 font-semibold"><i class="fa-regular fa-calendar-days mr-1 text-sky-400"></i> ${ann.date}</p>
+                            </div>
+                            <button onclick="deleteAnnouncement(${ann.id})" class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-xl text-[9px] font-bold transition flex items-center space-x-1 shrink-0">
+                                <i class="fa-solid fa-trash-can"></i> <span>Hapus</span>
+                            </button>
+                        `;
+                        adminList.appendChild(div);
+                    });
+                }
+            }
+        };
+
+        const submitAnnouncement = (e) => {
+            e.preventDefault();
+            const titleInput = document.getElementById('ann-title');
+            const contentInput = document.getElementById('ann-content');
+
+            const now = new Date();
+            const formattedDate = now.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            const newAnn = {
+                id: Date.now(),
+                title: titleInput.value.trim(),
+                content: contentInput.value.trim(),
+                date: formattedDate
+            };
+
+            announcements.unshift(newAnn);
+            saveToStorage('rs_announcements', announcements);
+
+            titleInput.value = '';
+            contentInput.value = '';
+
+            renderAnnouncements();
+            openAlert("Pengumuman Terbit", "Pengumuman berhasil dipublikasikan.");
+        };
+
+        const deleteAnnouncement = (id) => {
+            announcements = announcements.filter(ann => ann.id !== id);
+            saveToStorage('rs_announcements', announcements);
+            renderAnnouncements();
+            openAlert("Terhapus", "Pengumuman berhasil ditarik.");
+        };
+
+        const simulateCSVExport = () => {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "NIP,Nama Karyawan,Tipe Absen,Shift,Waktu,Status Kehadiran,Jarak (Meter),Latitude,Longitude\n";
+
+            attendanceHistory.forEach(item => {
+                const row = `"${item.nip}","${item.name}","${item.type}","${item.shift}","${item.time}","${item.status}",${item.distance},${item.lat},${item.lng}`;
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Rekap_Absensi_RS_Aghisna_Medika_Sidareja.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        const initSettingsForm = () => {
+            document.getElementById('set-rs-name').value = rsSettings.name;
+            document.getElementById('set-rs-radius').value = rsSettings.radius;
+            document.getElementById('set-rs-lat').value = rsSettings.lat;
+            document.getElementById('set-rs-lng').value = rsSettings.lng;
+        };
+
+        const saveHospitalSettings = (e) => {
+            e.preventDefault();
+            const name = document.getElementById('set-rs-name').value.trim();
+            const radius = parseInt(document.getElementById('set-rs-radius').value);
+            const lat = parseFloat(document.getElementById('set-rs-lat').value);
+            const lng = parseFloat(document.getElementById('set-rs-lng').value);
+
+            rsSettings = { name, radius, lat, lng };
+            saveToStorage('rs_settings', rsSettings);
+
+            openAlert("Setting Berhasil", "Batas jangkauan geofence berhasil diubah.");
+        };
+
+        window.onload = () => {
+            startLiveClock();
+            initSettingsForm();
+        };
+    </script>
+</body>
+</html>
